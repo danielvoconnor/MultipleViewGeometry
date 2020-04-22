@@ -16,7 +16,6 @@ from mpl_toolkits import mplot3d
 # Finally we triangulate 3D point locations by solving a least squares problem (using the SVD).
 
 
-
 def fundMatrix(img0Coords, img1Coords, normalize = True): 
     
     ''' 
@@ -63,7 +62,6 @@ def fundMatrix(img0Coords, img1Coords, normalize = True):
         vec1 = img1Coords_normalized[:,j]
         
         mtrx[j] = np.hstack((vec1[0]*vec0, vec1[1]*vec0,vec1[2]*vec0))
-        
     
     U, S, VT = np.linalg.svd(mtrx, full_matrices = False)
     
@@ -91,6 +89,7 @@ def fundMatrix(img0Coords, img1Coords, normalize = True):
     ####################################
     
     return F
+
 
 def essentialMatrix(img0Coords,img1Coords,K0,K1):
     '''
@@ -125,6 +124,7 @@ def essentialMatrix(img0Coords,img1Coords,K0,K1):
     
     return E
 
+
 def camMatricesFromEssentialMatrix(E,K0,K1, point0, point1):
     '''
     We extract a pair of camera matrices from an essential matrix E using the
@@ -149,7 +149,6 @@ def camMatricesFromEssentialMatrix(E,K0,K1, point0, point1):
         U = -U
     if np.linalg.det(VT) < 0:
         VT = -VT
-    
     
     u3 = U[:,2]
     u3 = np.reshape(u3,(3,1))
@@ -188,6 +187,7 @@ def camMatricesFromEssentialMatrix(E,K0,K1, point0, point1):
     m = np.argmax(flags)
     return (K0 @ P0, K1 @ M[m])
 
+
 def camMatricesFromPointPairs(imageCoords0, imageCoords1, K0, K1):  
     '''
     Inputs:  K0 and K1 are 3 by 3 numpy arrays. 
@@ -205,6 +205,7 @@ def camMatricesFromPointPairs(imageCoords0, imageCoords1, K0, K1):
     (P0,P1) = camMatricesFromEssentialMatrix(E,K0,K1, point_0, point_i)
     
     return (P0, P1)
+
 
 def reconstructPointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
     '''
@@ -237,7 +238,6 @@ def reconstructPointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
         X_est[:,j] = X0[0:3]
         
     return X_est
-
     
 
 def camCenterFromCamMatrix(P): 
@@ -250,6 +250,7 @@ def camCenterFromCamMatrix(P):
     nullVec = V[:,3]
     
     return (nullVec/nullVec[3])[0:3]
+
 
 def crossProdMatrix(v):
     '''
@@ -285,7 +286,6 @@ def projectPointCloudIntoImages(X, camMatrices):
     return imageCoords
 
 
-#%%
 def createFakePointCloud():
     '''
     This function creates a simple point cloud that can be used
@@ -311,8 +311,6 @@ def createFakePointCloud():
     return X
 
 
-
-#%%
 def createFakeCameras():
     '''
     This function creates some camera matrices that
@@ -360,6 +358,7 @@ def createFakeCameras():
         camMatrices[i] = K @ M
         
     return camMatrices, K, camCenters
+
 
 def set_axes_equal(ax):
     '''Make axes of 3D plot have equal scale so that spheres appear as spheres,
