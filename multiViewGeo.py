@@ -16,6 +16,28 @@ from mpl_toolkits import mplot3d
 # Finally we triangulate 3D point locations using the DLT method
 # given in section 12.2 of Hartley and Zisserman.
 
+def normalizeImageCoords(imgCoords):
+    
+    '''
+    imgCoords is a 2 by numPoints numpy array.
+    '''
+    
+    numPoints = imgCoords.shape[1]
+    
+    mu = np.mean(imgCoords, axis = 1)
+    d = np.sqrt((imgCoords[0] - mu[0])**2 + (imgCoords[1] - mu[1])**2)
+    
+    scaleFactor = np.sqrt(2)/np.mean(d)
+    
+    T = np.array([[scaleFactor, 0, -scaleFactor*mu[0]],[0,scaleFactor, -scaleFactor*mu[1]], [0,0,1]])
+    
+    allOnes = np.ones((1,numPoints))
+    imgCoords = np.vstack((imgCoords,allOnes))
+    
+    imgCoords = T @ imgCoords
+    
+    return imgCoords, T
+
 
 def fundMatrix(img0Coords, img1Coords, normalize = True): 
     
@@ -33,34 +55,17 @@ def fundMatrix(img0Coords, img1Coords, normalize = True):
     numPoints = img0Coords.shape[1]
     mtrx = np.zeros((numPoints,9))
     
-    allOnes = np.ones((1,numPoints))
-    img0Coords = np.vstack((img0Coords,allOnes))
-    img1Coords = np.vstack((img1Coords,allOnes))
-    
-    xBar = np.mean(img0Coords[0,:])
-    yBar = np.mean(img0Coords[1,:])
-    sigma_x = np.std(img0Coords[0,:])
-    sigma_y = np.std(img0Coords[1,:])
-    T0 = np.array([[1/sigma_x, 0, -xBar/sigma_x],[0,1/sigma_y, -yBar/sigma_y], [0,0,1]])
-
-    
-    xBar = np.mean(img1Coords[0,:])
-    yBar = np.mean(img1Coords[1,:])
-    sigma_x = np.std(img1Coords[0,:])
-    sigma_y = np.std(img1Coords[1,:])
-    T1 = np.array([[1/sigma_x, 0, -xBar/sigma_x],[0,1/sigma_y, -yBar/sigma_y], [0,0,1]])
-    
-    if not normalize:
+    if normalize:
+        img0Coords, T0 = normalizeImageCoords(img0Coords)
+        img1Coords, T1 = normalizeImageCoords(img1Coords)
+    else:
         T0 = np.eye(3) 
         T1 = np.eye(3)
     
-    img0Coords_normalized = T0 @ img0Coords
-    img1Coords_normalized = T1 @ img1Coords
-    
     for j in range(numPoints):
         
-        vec0 = img0Coords_normalized[:,j]
-        vec1 = img1Coords_normalized[:,j]
+        vec0 = img0Coords[:,j]
+        vec1 = img1Coords[:,j]
         
         mtrx[j] = np.hstack((vec1[0]*vec0, vec1[1]*vec0,vec1[2]*vec0))
     
@@ -169,17 +174,13 @@ def camMatricesFromEssentialMatrix(E,K0,K1, point0, point1):
     # is in front of both cameras.
     # See section 9.6.3 in Hartley and Zisserman,
     # particularly figure 9.12.
-    A0 = crossProdMatrix(point0) @ P0
+
     flags = np.ones(4, dtype=bool)
     
     for m in range(4):
         
-        A1 = crossProdMatrix(point1) @ M[m]
-        A = np.vstack((A0,A1))
-        U, S, VT = np.linalg.svd(A)    
-        V = VT.T
-        X0 = V[:,3]
-        X0 = X0/X0[3]
+        X0 = triangulatePointCloud_twoViews(P0,M[m],point0[0:2].reshape((2,1)),point1[0:2].reshape((2,1)), normalize = False)
+        X0 = np.append(X0,1)
         X1 = M[m] @ X0
         
         flags[m] = (X0[2] > 0) and (X1[2] > 0)
@@ -189,26 +190,37 @@ def camMatricesFromEssentialMatrix(E,K0,K1, point0, point1):
     return (K0 @ P0, K1 @ M[m])
 
 
-def camMatricesFromPointPairs(imageCoords0, imageCoords1, K0, K1):  
+def camMatricesFromPointPairs(image0Coords, image1Coords, K0, K1):  
     '''
     Inputs:  K0 and K1 are 3 by 3 numpy arrays. 
     They are the calibration matrices for cameras 0 and 1, respectively.
-    imageCoords0 and imageCoords1 are 2 by numPoints numpy arrays.
+    image0Coords and image1Coords are 2 by numPoints numpy arrays.
     They are lists of corresponding points in the two views.
     '''
 
-    E = essentialMatrix(imageCoords0,imageCoords1,K0,K1)
+    E = essentialMatrix(image0Coords,image1Coords,K0,K1)
     
-    numPoints = imageCoords0.shape[1]
+    numPoints = image0Coords.shape[1]
     j = round(numPoints/2)
-    point_0 = imageCoords0[:,j]
-    point_i = imageCoords1[:,j]
-    (P0,P1) = camMatricesFromEssentialMatrix(E,K0,K1, point_0, point_i)
+    point0 = image0Coords[:,j]
+    point1 = image1Coords[:,j]
+    (P0,P1) = camMatricesFromEssentialMatrix(E,K0,K1, point0, point1)
     
     return (P0, P1)
 
+def camCenterFromCamMatrix(P): 
+    '''
+    Input: P is a 3 by 4 numpy array (a camera matrix).
+    '''
+    
+    U, S, VT = np.linalg.svd(P)
+    V = VT.T
+    nullVec = V[:,3]
+    
+    return (nullVec/nullVec[3])[0:3]
 
-def triangulatePointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
+
+def triangulatePointCloud_twoViews(P0,P1,img0Coords,img1Coords, normalize = True):
     '''
     Given camera matrices for two views of a scene,
     and a list of corresponding points in the two views,
@@ -216,17 +228,29 @@ def triangulatePointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
     section 12.2 of Hartley and Zisserman.
     
     Inputs: P0 and P1 are 3 by 4 numpy arrays (camera matrices).
-    imgCoords0 and imgCoords1 are 2 by numPoints numpy arrays.
+    img0Coords and img1Coords are 2 by numPoints numpy arrays.
     '''
     
-    numPoints = imgCoords0.shape[1]
+    numPoints = img0Coords.shape[1]
+    
+    # First normalize image coordinates and adjust P0 and P1 accordingly.
+    if normalize:
+        img0Coords, T0 = normalizeImageCoords(img0Coords)
+        img1Coords, T1 = normalizeImageCoords(img1Coords)
+    else:
+        T0 = np.eye(3)
+        T1 = np.eye(3)
+    
+    P0 = T0 @ P0
+    P1 = T1 @ P1
+
     
     X_est = np.zeros((3,numPoints))
     
     for j in range(numPoints):
         
-        x0, y0 = imgCoords0[:,j]
-        x1, y1 = imgCoords1[:,j]
+        x0, y0 = img0Coords[0:2,j]
+        x1, y1 = img1Coords[0:2,j]
         
         A0 = np.vstack((x0*P0[2] - P0[0], y0*P0[2] - P0[1]))
         A1 = np.vstack((x1*P1[2] - P1[0], y1*P1[2] - P1[1]))
@@ -240,18 +264,6 @@ def triangulatePointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
         X_est[:,j] = X0[0:3]
         
     return X_est
-    
-
-def camCenterFromCamMatrix(P): 
-    '''
-    Input: P is a 3 by 4 numpy array (a camera matrix).
-    '''
-    
-    U, S, VT = np.linalg.svd(P)
-    V = VT.T
-    nullVec = V[:,3]
-    
-    return (nullVec/nullVec[3])[0:3]
 
 
 def crossProdMatrix(v):
@@ -420,7 +432,7 @@ if __name__ == '__main__':
     i = 2 # We'll do a two-view reconstruction using image 0 and image i.
     
     P0, Pi = camMatricesFromPointPairs(imageCoords[0], imageCoords[i], K, K)
-    X_est = triangulatePointCloud_twoViews(P0,Pi,imageCoords[0],imageCoords[i])
+    X_est = triangulatePointCloud_twoViews(P0,Pi,imageCoords[0],imageCoords[i], normalize = True)
     
     center_0 = camCenterFromCamMatrix(P0)
     center_i = camCenterFromCamMatrix(Pi)
@@ -432,6 +444,7 @@ if __name__ == '__main__':
     ax.scatter3D(*center_i, color = 'orange')
     plt.title('Two view reconstruction of point cloud and camera positions')
     set_axes_equal(ax)
+
 
 
 
