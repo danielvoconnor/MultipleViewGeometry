@@ -266,16 +266,6 @@ def triangulatePointCloud_twoViews(P0,P1,img0Coords,img1Coords, normalize = True
     return X_est
 
 
-def crossProdMatrix(v):
-    '''
-    Input: v is a numpy array with 3 components (a vector in R^3).
-    We construct a matrix C such that C @ x = np.cross(v,x)
-    (the cross product of v and x).
-    '''
-    
-    return np.array([[0,-v[2],v[1]],[v[2],0,-v[0]],[-v[1],v[0],0]])
-
-
 def projectPointCloudIntoImages(X, camMatrices):
     '''
     Inputs: X is 3 by numPoints.
