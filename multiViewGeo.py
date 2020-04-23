@@ -208,7 +208,7 @@ def camMatricesFromPointPairs(imageCoords0, imageCoords1, K0, K1):
     return (P0, P1)
 
 
-def reconstructPointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
+def triangulatePointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
     '''
     Given camera matrices for two views of a scene,
     and a list of corresponding points in the two views,
@@ -225,17 +225,17 @@ def reconstructPointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
     
     for j in range(numPoints):
         
-        point0 = np.append(imgCoords0[:,j],1)
-        point1 = np.append(imgCoords1[:,j],1)
+        x0, y0 = imgCoords0[:,j]
+        x1, y1 = imgCoords1[:,j]
         
-        A0 = crossProdMatrix(point0) @ P0
-        A1 = crossProdMatrix(point1) @ P1
+        A0 = np.vstack((x0*P0[2] - P0[0], y0*P0[2] - P0[1]))
+        A1 = np.vstack((x1*P1[2] - P1[0], y1*P1[2] - P1[1]))
         A = np.vstack((A0,A1))
+        
         U, S, VT = np.linalg.svd(A)    
         V = VT.T
         X0 = V[:,3]
         X0 = X0/X0[3]
-        # X1 = P1 @ X1 
         
         X_est[:,j] = X0[0:3]
         
@@ -420,7 +420,7 @@ if __name__ == '__main__':
     i = 2 # We'll do a two-view reconstruction using image 0 and image i.
     
     P0, Pi = camMatricesFromPointPairs(imageCoords[0], imageCoords[i], K, K)
-    X_est = reconstructPointCloud_twoViews(P0,Pi,imageCoords[0],imageCoords[i])
+    X_est = triangulatePointCloud_twoViews(P0,Pi,imageCoords[0],imageCoords[i])
     
     center_0 = camCenterFromCamMatrix(P0)
     center_i = camCenterFromCamMatrix(Pi)
