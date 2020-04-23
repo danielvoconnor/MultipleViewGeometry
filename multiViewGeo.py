@@ -19,7 +19,7 @@ from mpl_toolkits import mplot3d
 def normalizeImageCoords(imgCoords):
     
     '''
-    imgCoords is a 2 by numPoints numpy array.
+    Input: imgCoords is a 2 by numPoints numpy array.
     '''
     
     numPoints = imgCoords.shape[1]
@@ -369,8 +369,7 @@ def set_axes_equal(ax):
     cubes as cubes, etc..  This is one possible solution to Matplotlib's
     ax.set_aspect('equal') and ax.axis('equal') not working for 3D.
 
-    Input
-      ax: a matplotlib axis, e.g., as output from plt.gca().
+    Input: ax is a matplotlib axis, e.g., as output from plt.gca().
     '''
     # This function is taken from https://stackoverflow.com/a/31364297/1854748
 
