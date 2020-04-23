@@ -13,7 +13,8 @@ from mpl_toolkits import mplot3d
 # Given a list of point correspondences between two images,
 # we compute the essential matrix E for this pair of images,
 # then extract camera matrices from the essential matrix E.
-# Finally we triangulate 3D point locations by solving a least squares problem (using the SVD).
+# Finally we triangulate 3D point locations using the DLT method
+# given in section 12.2 of Hartley and Zisserman.
 
 
 def fundMatrix(img0Coords, img1Coords, normalize = True): 
@@ -211,7 +212,8 @@ def reconstructPointCloud_twoViews(P0,P1,imgCoords0,imgCoords1):
     '''
     Given camera matrices for two views of a scene,
     and a list of corresponding points in the two views,
-    we reconstruct a point cloud.
+    we reconstruct a point cloud using the DLT method given in
+    section 12.2 of Hartley and Zisserman.
     
     Inputs: P0 and P1 are 3 by 4 numpy arrays (camera matrices).
     imgCoords0 and imgCoords1 are 2 by numPoints numpy arrays.
